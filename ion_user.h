@@ -18,21 +18,30 @@
  *  limitations under the License.
  */
 
-#include <linux/ion.h>
-#include <linux/omap_ion.h>
+struct ion_handle;
+/**
+ * enum ion_heap_types - list of all possible types of heaps
+ * @ION_HEAP_TYPE_SYSTEM:	 memory allocated via vmalloc
+ * @ION_HEAP_TYPE_SYSTEM_CONTIG: memory allocated via kmalloc
+ * @ION_HEAP_TYPE_CARVEOUT:	 memory allocated from a prereserved
+ * 				 carveout heap, allocations are physically
+ * 				 contiguous
+ * @ION_HEAP_END:		 helper for iterating over heaps
+ */
+enum ion_heap_type {
+	ION_HEAP_TYPE_SYSTEM,
+	ION_HEAP_TYPE_SYSTEM_CONTIG,
+	ION_HEAP_TYPE_CARVEOUT,
+	ION_HEAP_TYPE_CUSTOM, /* must be last so device specific heaps always
+				 are at the end of this enum */
+	ION_NUM_HEAPS,
+};
 
-int ion_open();
-int ion_close(int fd);
-int ion_alloc(int fd, size_t len, size_t align, unsigned int flags,
-              struct ion_handle **handle);
-int ion_alloc_tiler(int fd, struct omap_ion_tiler_alloc_data **al_data, struct ion_handle **handle, size_t *stride);
-int ion_free(int fd, struct ion_handle *handle);
-int ion_map(int fd, struct ion_handle *handle, size_t length, int prot,
-            int flags, off_t offset, uint16_t **ptr, int *map_fd);
-int ion_share(int fd, struct ion_handle *handle, int *share_fd);
-int ion_import(int fd, int share_fd, struct ion_handle **handle);
+#define ION_HEAP_SYSTEM_MASK		(1 << ION_HEAP_TYPE_SYSTEM)
+#define ION_HEAP_SYSTEM_CONTIG_MASK	(1 << ION_HEAP_TYPE_SYSTEM_CONTIG)
+#define ION_HEAP_CARVEOUT_MASK		(1 << ION_HEAP_TYPE_CARVEOUT)
 
-# if 0
+
 /**
  * DOC: Ion Userspace API
  *
@@ -40,6 +49,61 @@ int ion_import(int fd, int share_fd, struct ion_handle **handle);
  * most operations handled via following ioctls
  *
  */
+
+struct omap_ion_tiler_alloc_data {
+	size_t w;
+	size_t h;
+	int fmt;
+	unsigned int flags;
+	struct ion_handle *handle;
+	size_t stride;
+	size_t offset;
+};
+
+
+#ifdef __KERNEL__
+int omap_ion_tiler_alloc(struct ion_client *client,
+			 struct omap_ion_tiler_alloc_data *data);
+int omap_ion_nonsecure_tiler_alloc(struct ion_client *client,
+			 struct omap_ion_tiler_alloc_data *data);
+/* given a handle in the tiler, return a list of tiler pages that back it */
+int omap_tiler_pages(struct ion_client *client, struct ion_handle *handle,
+		     int *n, u32 ** tiler_pages);
+#endif /* __KERNEL__ */
+
+/* additional heaps used only on omap */
+enum {
+	OMAP_ION_HEAP_TYPE_TILER = ION_HEAP_TYPE_CUSTOM + 1,
+};
+
+#define OMAP_ION_HEAP_TILER_MASK (1 << OMAP_ION_HEAP_TYPE_TILER)
+
+enum {
+	OMAP_ION_TILER_ALLOC,
+};
+
+/**
+ * These should match the defines in the tiler driver
+ */
+enum {
+	TILER_PIXEL_FMT_MIN   = 0,
+	TILER_PIXEL_FMT_8BIT  = 0,
+	TILER_PIXEL_FMT_16BIT = 1,
+	TILER_PIXEL_FMT_32BIT = 2,
+	TILER_PIXEL_FMT_PAGE  = 3,
+	TILER_PIXEL_FMT_MAX   = 3
+};
+
+/**
+ * List of heaps in the system
+ */
+enum {
+	OMAP_ION_HEAP_LARGE_SURFACES,
+	OMAP_ION_HEAP_TILER,
+	OMAP_ION_HEAP_SECURE_INPUT,
+	OMAP_ION_HEAP_NONSECURE_TILER,
+};
+
 
 /**
  * struct ion_allocation_data - metadata passed from userspace for allocations
@@ -94,7 +158,7 @@ struct ion_custom_data {
 	unsigned long arg;
 };
 
-#endif
+
 
 #define ION_IOC_MAGIC		'I'
 
@@ -152,6 +216,14 @@ struct ion_custom_data {
  */
 #define ION_IOC_CUSTOM		_IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)
 
-//#endif
 
-
+int ion_open();
+int ion_close(int fd);
+int ion_alloc(int fd, size_t len, size_t align, unsigned int flags,
+              struct ion_handle **handle);
+int ion_alloc_tiler(int fd, struct omap_ion_tiler_alloc_data **al_data, struct ion_handle **handle, size_t *stride);
+int ion_free(int fd, struct ion_handle *handle);
+int ion_map(int fd, struct ion_handle *handle, size_t length, int prot,
+            int flags, off_t offset, uint16_t **ptr, int *map_fd);
+int ion_share(int fd, struct ion_handle *handle, int *share_fd);
+int ion_import(int fd, int share_fd, struct ion_handle **handle);

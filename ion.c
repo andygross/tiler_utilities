@@ -28,8 +28,6 @@
 //#define LOG_TAG "ion"
 //#include <cutils/log.h>
 
-#include <linux/ion.h>
-#include <linux/omap_ion.h>
 #include "ion_user.h"
 
 static int usage_count;

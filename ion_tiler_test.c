@@ -13,8 +13,6 @@
 #include <stdint.h>
 #include "ion_user.h"
 #include "testlib.h"
-#include <linux/ion.h>
-#include <linux/omap_ion.h>
 
 int align = 0;
 int prot = PROT_READ | PROT_WRITE;
@@ -1115,6 +1113,53 @@ exit:
         close(map_fd);
 }
 
+#if 0
+int negative_arbitvalue_test(uint32_t length, size_t stride)
+{
+        int fd, map_fd, ret;
+        struct ion_handle *handle;
+        uint16_t *ptr;
+
+        struct omap_ion_tiler_alloc_data alloc_data = {
+                .w = length,
+                .h = 1,
+                .fmt = TILER_PIXEL_FMT_PAGE,
+        };
+
+        uint16_t val = (uint16_t) rand();
+        fd = ion_open();
+        if (fd < 0)
+                return fd;
+
+        if (_ion_alloc_test(fd, &handle, &alloc_data))
+                        return;
+
+        if (tiler_test)
+              length = alloc_data.h * alloc_data.stride;
+        ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
+        if (ret)
+                return;
+
+        if (tiler_test)
+                _ion_tiler_map_test(ptr, &alloc_data);
+
+                 fill_mem(val, ptr, &alloc_data);
+                 check_mem(val, ptr, &alloc_data);
+
+        munmap(ptr, length);
+        ret = ion_free(fd, 0x12345678);
+        if (ret == -EINVAL)
+                goto exit;
+        if (ret) {
+                printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
+                return;
+        }
+exit:
+        ion_close(fd);
+        close(map_fd);
+}
+
+#endif
 
 #if 0
 void ion_share_test()
