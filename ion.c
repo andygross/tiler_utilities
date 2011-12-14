@@ -100,6 +100,7 @@ int ion_alloc_tiler(int fd, struct omap_ion_tiler_alloc_data **al_data, struct i
                 .cmd = OMAP_ION_TILER_ALLOC,
                 .arg = (unsigned long)(*al_data),
         };
+//	printf("value of width = %d height = %d fmt = %d\n", (*al_data)->w, (*al_data)->h, (*al_data)->fmt);
         ret = ion_ioctl(fd, ION_IOC_CUSTOM, &custom_data);
         if (ret < 0)
                 return ret;
