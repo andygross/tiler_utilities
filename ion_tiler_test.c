@@ -39,7 +39,7 @@ typedef enum pixel_fmt_t pixel_fmt_t;
 
 #endif
 #define TESTS\
-/*    T(alloc_1D_test(4096, 0))\
+    T(alloc_1D_test(4096, 0))\
     T(alloc_1D_test(176 * 144 * 2, 0))\
     T(alloc_1D_test(640 * 480 * 2, 0))\
     T(alloc_1D_test(848 * 480 * 2, 0))\
@@ -88,9 +88,9 @@ typedef enum pixel_fmt_t pixel_fmt_t;
     T(map_1D_test(32768, 0))\
     T(map_1D_test(65536, 0))\
     T(alloc_2D_test(176, 144, TILER_PIXEL_FMT_32BIT))\
-   T(alloc_NV12_test(176, 144))\
+    T(alloc_NV12_test(176, 144))\
     T(alloc_NV12_test(640, 480))\
-   T(alloc_NV12_test(848, 480))\
+    T(alloc_NV12_test(848, 480))\
     T(alloc_NV12_test(1280, 720))\
    T(alloc_NV12_test(1920, 1080))\
    T(maxalloc_2D_test(2500, 32, TILER_PIXEL_FMT_8BIT, MAX_ALLOCS))\
@@ -133,7 +133,7 @@ typedef enum pixel_fmt_t pixel_fmt_t;
    T(negative_free_2D_test(1920, 1080, TILER_PIXEL_FMT_16BIT)) \
    T(negative_free_1D_test(176 * 144 * 2, 0)) \
    T(negative_arbitvalue_test(176 * 144 * 2, 0)) \
- */T(random_alloc_test(1000,10)) \
+   T(random_alloc_test(1000,10)) \
 
 //typedef enum pixel_fmt_t pixel_fmt_t;
 int check_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *al_data);
@@ -215,8 +215,11 @@ int maxalloc_1D_test(uint32_t length, int max_allocs)
 {
     printf("Allocate & Free max # of %ub 1D buffers\n", length);
 
-    int fd, ret;
+    int fd, ret, map_fd;
     struct ion_handle *handle;
+    //uint32_t length;
+    uint16_t *ptr;
+
     struct omap_ion_tiler_alloc_data alloc_data = {
                 .w = length,
                 .h = 1,
@@ -232,10 +235,11 @@ int maxalloc_1D_test(uint32_t length, int max_allocs)
        if (fd < 0)
           return fd;
 
+     uint16_t val = (uint16_t) rand();
 
     /* allocate as many buffers as we can */
     mem = (struct data *)calloc(max_allocs, sizeof(struct data));
-    void *ptr = (void *)mem;
+    //void *ptr = (void *)mem;
     int ix, res = 0;
     for (ix = 0;  ix < max_allocs;)
     {
@@ -247,7 +251,21 @@ int maxalloc_1D_test(uint32_t length, int max_allocs)
 	   {
             mem[ix].bufPtr = handle;
 	    printf("handle allocated count = %d handle =%x\n", ix, mem[ix].bufPtr);
-            ix++; 
+
+	length = alloc_data.h * alloc_data.stride;
+        ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
+        if (ret)
+                return;
+
+        if (tiler_test)
+               // _ion_tiler_map_test(ptr, &alloc_data);
+
+                 fill_mem(val, ptr, &alloc_data);
+                 check_mem(val, ptr, &alloc_data);
+
+        	munmap(ptr, length);
+		close(map_fd);
+           ix++; 
     	}	
     }
     printf(":: Allocated %d buffers", ix);
@@ -290,12 +308,12 @@ int alloc_2D_test(uint32_t width, uint32_t height, int fmt)
 
 	if (tiler_test)
               length = height * alloc_data.stride;
+
+	      printf("2d length = %x\n", length);
         ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
         if (ret)
                 return;
 
-        if (tiler_test)
- //               _ion_tiler_map_test(ptr, &alloc_data);
 		fill_mem(val, ptr, &alloc_data);
                 check_mem(val, ptr, &alloc_data);
 
@@ -315,8 +333,11 @@ int maxalloc_2D_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
 {
    // printf("Allocate & Free max # of %ub 1D buffers\n", length);
 
-    int fd, ret;
+    int fd, ret, map_fd;
     struct ion_handle *handle;
+    uint16_t *ptr;
+    uint32_t length;
+
     struct omap_ion_tiler_alloc_data alloc_data = {
                 .w = width,
                 .h = height,
@@ -331,10 +352,11 @@ int maxalloc_2D_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
        if (fd < 0)
           return fd;
 
+     uint16_t val = (uint16_t) rand();
 
     /* allocate as many buffers as we can */
     mem = (struct data *)calloc(max_allocs, sizeof(struct data));
-    void *ptr = (void *)mem;
+    //void *ptr = (void *)mem;
     int ix, res = 0;
     for (ix = 0;  ix < max_allocs;)
     {
@@ -346,7 +368,20 @@ int maxalloc_2D_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
            {
             mem[ix].bufPtr = handle;
 	    printf("handle allocated count = %d handle =%x\n", ix, mem[ix].bufPtr);
-            ix++;
+	    
+	    length = height * alloc_data.stride;
+            printf("2d length = %x\n", length);
+           ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
+
+        if (ret)
+                return;
+
+                fill_mem(val, ptr, &alloc_data);
+                check_mem(val, ptr, &alloc_data);
+
+        	munmap(ptr, length);
+        	close(map_fd);	    
+        	ix++;
         }
     }
     printf(":: Allocated %d buffers", ix);
@@ -370,9 +405,9 @@ exit:
 
 int alloc_NV12_test(uint32_t width, uint32_t height)
 {
-        int fd, map_fd, ret;
-        uint32_t length;
-        unsigned char *ptr1, *ptr2;
+        int fd, map_fd1, map_fd2, ret;
+        uint32_t length1, length2;
+        uint16_t *ptr1, *ptr2;
         struct ion_handle *handle_y, *handle_uv;
 
         struct omap_ion_tiler_alloc_data alloc_data_y = {
@@ -391,6 +426,8 @@ int alloc_NV12_test(uint32_t width, uint32_t height)
         fd = ion_open();
         if (fd < 0)
                 return fd;
+	
+	uint16_t val = (uint16_t) rand();
 
 
         if (_ion_alloc_test(fd, &handle_y, &alloc_data_y))
@@ -398,25 +435,27 @@ int alloc_NV12_test(uint32_t width, uint32_t height)
 
 	if (_ion_alloc_test(fd, &handle_uv, &alloc_data_uv))
                         return;
-/*
+
         if (tiler_test)
-              length = alloc_data_y.h * alloc_data_y.stride;
-        ret = ion_map(fd, handle_y, length, prot, map_flags, 0, &ptr1, &map_fd);
+              length1 = alloc_data_y.h * alloc_data_y.stride;
+        ret = ion_map(fd, handle_y, length1, prot, map_flags, 0, &ptr1, &map_fd1);
         if (ret)
                 return;
 
-	length = alloc_data_uv.h * alloc_data_uv.stride;
-	ret = ion_map(fd, handle_uv, length, prot, map_flags, 0, &ptr2, &map_fd);
+	length2 = alloc_data_uv.h * alloc_data_uv.stride;
+	ret = ion_map(fd, handle_uv, length2, prot, map_flags, 0, &ptr2, &map_fd2);
 	if (ret)
 		return;
 
-        if (tiler_test)
-                _ion_tiler_map_test(ptr1, &alloc_data_y);
-		_ion_tiler_map_test(ptr2, &alloc_data_uv);
+		fill_mem(val, ptr1, &alloc_data_y);
+                check_mem(val, ptr1, &alloc_data_y);
+		
+		fill_mem(val, ptr2, &alloc_data_uv);
+                check_mem(val, ptr2, &alloc_data_uv);
 
-        munmap(ptr1, length);
-	munmap(ptr2, length);
-*/
+        munmap(ptr1, length1);
+	munmap(ptr2, length2);
+
         ret = ion_free(fd, handle_y);
 
 	if (ret) {
@@ -431,14 +470,15 @@ int alloc_NV12_test(uint32_t width, uint32_t height)
                 return;
         }
         ion_close(fd);
-      //  close(map_fd);
+        close(map_fd1);
+	close(map_fd2);
 }
 
 int maxalloc_NV12_test(uint32_t width, uint32_t height, uint32_t max_allocs)
 {
-        int fd, map_fd, ret;
-        uint32_t length;
-        unsigned char *ptr1, *ptr2;
+        int fd, map_fd1, map_fd2, ret;
+        uint32_t length, length1, length2;
+        uint16_t *ptr1, *ptr2;
         struct ion_handle *handle_y, *handle_uv;
 
         struct omap_ion_tiler_alloc_data alloc_data_y = {
@@ -464,9 +504,11 @@ int maxalloc_NV12_test(uint32_t width, uint32_t height, uint32_t max_allocs)
         if (fd < 0)
                 return fd;
 
+	uint16_t val = (uint16_t) rand();
+
     /* allocate as many buffers as we can */
     mem = (struct data *)calloc(max_allocs, sizeof(struct data));
-    void *ptr = (void *)mem;
+   // void *ptr = (void *)mem;
     int ix, res = 0;
     
 	for (ix = 0;  ix < max_allocs;) {
@@ -487,25 +529,23 @@ int maxalloc_NV12_test(uint32_t width, uint32_t height, uint32_t max_allocs)
             		ix++;
         	}		
 	}
-     /*
+     
         if (tiler_test)
-              length = alloc_data_y.h * alloc_data_y.stride;
-        ret = ion_map(fd, handle_y, length, prot, map_flags, 0, &ptr1, &map_fd);
+              length1 = alloc_data_y.h * alloc_data_y.stride;
+        ret = ion_map(fd, handle_y, length1, prot, map_flags, 0, &ptr1, &map_fd1);
         if (ret)
                 return;
 
-        length = alloc_data_uv.h * alloc_data_uv.stride;
-        ret = ion_map(fd, handle_uv, length, prot, map_flags, 0, &ptr2, &map_fd);
+        length2 = alloc_data_uv.h * alloc_data_uv.stride;
+        ret = ion_map(fd, handle_uv, length2, prot, map_flags, 0, &ptr2, &map_fd2);
         if (ret)
                 return;
 
-        if (tiler_test)
-                _ion_tiler_map_test(ptr1, &alloc_data_y);
-                _ion_tiler_map_test(ptr2, &alloc_data_uv);
+        munmap(ptr1, length1);
+        close(map_fd1);
+        munmap(ptr2, length2);
+	close(map_fd2);
 
-      munmap(ptr1, length);
-        munmap(ptr2, length);
-*/
 exit:
 	while (ix--) 
 	{
@@ -1123,17 +1163,17 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
        uint32_t width, height;
         uint32_t  length;
         void    *bufPtr;
-        void    *buffer;
+        void    *bufPtr1;
         void    *dataPtr;
 	uint16_t stride;
 	int fmt;
 	int fd1;
     } *mem;
 
-   struct ion_handle *handle;
+   struct ion_handle *handle, *handle_uv;
    int fd, ret, map_fd;
-   uint16_t *ptr;
-   uint32_t length;
+   uint16_t *ptr, *ptr1, *ptr2;
+   uint32_t length, length1, length2;
    uint16_t val;
   
    struct omap_ion_tiler_alloc_data alloc_data;
@@ -1153,25 +1193,31 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
 	printf("++++++++number of ops =%d++++++++\n", num_ops);
         ix = rand() % num_slots;
         /* see if we need to free/unmap data */
-        if (mem[ix].bufPtr)
+        if (mem[ix].bufPtr) 
         {
             /* check memory fill */
             switch (mem[ix].op)
             {
-           /* case 0: //res = ion_free(fd, mem[ix].bufPtr);
+            //case 0: //res = ion_free(fd, mem[ix].bufPtr);
                 //free(mem[ix].buffer);
-                break;
-            case 1: res = ion_free(fd, mem[ix].bufPtr); break;*/
+           //     break;
+            case 1: res = ion_free(fd, mem[ix].bufPtr); 
+                    printf("memory-fill check: 1 freing return val =%d\n",res);
+		    break;
             case 2: res = ion_free(fd, mem[ix].bufPtr);
-		    printf("inside case 2 freing return val =%d\n",res); 
+		    printf("memory-fill check: 2 freing return val =%d\n",res); 
 		    break;
             case 3: res = ion_free(fd, mem[ix].bufPtr);
-		    printf("inside case 2 freing return val =%d\n",res);
+		    printf("memory-fill check: 3 freing return val =%d\n",res);
 		    break;
             case 4: res = ion_free(fd, mem[ix].bufPtr);
-                    printf("inside case 2 freing return val =%d\n",res);
-		   break;
-           /* case 5: res = ion_free(fd, mem[ix].bufPtr); break;*/
+                    printf("memory-fill check: 4 freing return val =%d\n",res);
+		    break;
+           case 5: res = ion_free(fd, mem[ix].bufPtr);
+		   printf("memory-fill check:  5-y freing return val =%d\n",res);
+		   res = ion_free(fd, mem[ix].bufPtr1);	
+		   printf("memory-fill check:  5-uv freing return val =%d\n",res);
+	 	   break;
             }
           //  P("%s[%p]", mem[ix].op ? "free" : "unmap", mem[ix].bufPtr);
           /*  ZERO(mem[ix]);*/  memset(&(mem[ix]), 0, sizeof(mem[ix]));
@@ -1197,14 +1243,14 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
             val = ((uint16_t)rand());
 
             /* perform operation */
-            mem[ix].op = "CCCCDDDDE"[(op >> 4) & 15] - 'A';
+            mem[ix].op = "BBBBCCCCDDDDEEEFF"[(op >> 4) & 15] - 'A';
             switch (mem[ix].op)
             {
             case 0: /* map 1D buffer */
                 mem[ix].op = 1;
             case 1:
 		alloc_data.fmt = TILER_PIXEL_FMT_PAGE;
-	//	alloc_data.h = 1;
+		alloc_data.h = 1;
 	        ret = _ion_alloc_test(fd, &handle, &alloc_data);
 		if (ret == -EINVAL) 
 			goto exit;
@@ -1222,7 +1268,7 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                                 munmap(ptr, length);
                                 ion_close(map_fd);
 
-		printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix,mem[ix].stride, mem[ix].fmt, mem[ix].height, mem[ix].width);
+		printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix,mem[ix].stride, alloc_data.fmt, mem[ix].height, mem[ix].width);
 	//	alloc_1D(mem[ix].length, 0, mem[ix].val);
         //        P("alloc[l=0x%x] = %p", mem[ix].length, mem[ix].bufPtr);
                 break;
@@ -1247,7 +1293,7 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                                 munmap(ptr, length);
                                 ion_close(map_fd);
 
-		printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, mem[ix].fmt, mem[ix].height, mem[ix].width);
+		printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, alloc_data.fmt, mem[ix].height, mem[ix].width);
 	//	printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, mem[ix].fmt);
         //        P("alloc[%d*%d*8] = %p", mem[ix].width, mem[ix].height, mem[ix].bufPtr);
                 break;
@@ -1271,7 +1317,7 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                                 ion_close(map_fd);
 
 	//	printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, mem[ix].fmt);
-		printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, mem[ix].fmt, mem[ix].height, mem[ix].width);
+		printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, alloc_data.fmt, mem[ix].height, mem[ix].width);
               //  P("alloc[%d*%d*16] = %p", mem[ix].width, mem[ix].height, mem[ix].bufPtr);
                 break;
             case 4:
@@ -1296,15 +1342,53 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                                 ion_close(map_fd);
 
 		//printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, mem[ix].fmt);
-          	printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, mem[ix].fmt, mem[ix].height, mem[ix].width);
+          	printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, alloc_data.fmt, mem[ix].height, mem[ix].width);
               //  P("alloc[%d*%d*32] = %p", mem[ix].width, mem[ix].height, mem[ix].bufPtr);
                 break;
             case 5:
-              //  al_data->fmt = TILER_PIXEL_FMT_8BIT;
-              //  ion_alloc_test(fd, &handle, &al_data);
-              //  mem[ix].bufPtr = handle;
-	      //	 mem[ix].bufPtr = alloc_NV12(mem[ix].width, mem[ix].height, mem[ix].val);
-              //  P("alloc[%d*%d*NV12] = %p", mem[ix].width, mem[ix].height, mem[ix].bufPtr);
+		printf("+++++++++Inside case 5 for NV12 Buffer++++++++\n");
+		alloc_data.fmt = TILER_PIXEL_FMT_8BIT;
+		mem[ix].height = alloc_data.h;
+                mem[ix].width = alloc_data.w;
+		struct omap_ion_tiler_alloc_data alloc_data_uv = {
+                .w = mem[ix].width >> 1,
+                .h = mem[ix].height >> 1,
+                .fmt = TILER_PIXEL_FMT_16BIT,
+        	};
+
+        	ret = _ion_alloc_test(fd, &handle, &alloc_data);
+              	if (ret == -EINVAL)
+			goto exit;
+			
+        	ret = _ion_alloc_test(fd, &handle_uv, &alloc_data_uv);
+                if (ret == -EINVAL)
+			goto exit;
+		mem[ix].bufPtr = handle;
+		mem[ix].bufPtr1 = handle_uv;
+		printf("value of NV12 Y bufPtr=%x, NV12 UV bufPtr=%x \n", mem[ix].bufPtr, mem[ix].bufPtr1);
+
+              length1 = alloc_data.h * alloc_data.stride;
+        	ret = ion_map(fd, handle, length1, prot, map_flags, 0, &ptr1, &map_fd);
+        	if (ret)
+                	return;
+
+              length2 = alloc_data_uv.h * alloc_data_uv.stride;
+               ret = ion_map(fd, handle_uv, length2, prot, map_flags, 0, &ptr2, &map_fd);
+        	if (ret)
+                	return;
+
+        if (tiler_test)
+                fill_mem(val, ptr1, &alloc_data);
+                check_mem(val, ptr1, &alloc_data);
+
+                fill_mem(val, ptr2, &alloc_data_uv);
+                check_mem(val, ptr2, &alloc_data_uv);
+
+         	munmap(ptr1, length1);
+        	munmap(ptr2, length2);
+		ion_close(map_fd);
+
+        //  P("alloc[%d*%d*NV12] = %p", mem[ix].width, mem[ix].height, mem[ix].bufPtr);
                 break;
             }
 
@@ -1373,7 +1457,9 @@ exit:
             case 2: ion_free(fd, mem[ix].bufPtr);printf("freed in case 2\n"); break;
             case 3: ion_free(fd, mem[ix].bufPtr);printf("freed in case 3\n"); break;
             case 4: ion_free(fd, mem[ix].bufPtr);printf("freed in case 4\n"); break;
-            case 5: ion_free(fd, mem[ix].bufPtr);printf("freed in case 5\n"); break;
+            case 5: ion_free(fd, mem[ix].bufPtr);ion_free(fd, mem[ix].bufPtr1);
+		    printf("freed in case 5\n");
+			break;
             }
         }
     }
