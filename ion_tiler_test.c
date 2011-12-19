@@ -135,7 +135,6 @@ typedef enum pixel_fmt_t pixel_fmt_t;
    T(negative_arbitvalue_test(176 * 144 * 2, 0)) \
    T(random_alloc_test(1000,10)) \
 
-//typedef enum pixel_fmt_t pixel_fmt_t;
 int check_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *al_data);
 void fill_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *al_data);
 
@@ -149,25 +148,6 @@ int _ion_alloc_test(int fd, struct ion_handle **handle, struct omap_ion_tiler_al
 		printf("%s failed: %s\n", __func__, strerror(ret));
 	return ret;
 }
-
-#if 0
-void ion_alloc_test()
-{
-	int fd, ret;
-	struct ion_handle *handle;
-
-	if(_ion_alloc_test(&fd, &handle))
-			return;
-
-	ret = ion_free(fd, handle);
-	if (ret) {
-		printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
-		return;
-	}
-	ion_close(fd);
-	printf("ion alloc test: passed\n");
-}
-#endif
 
 int alloc_1D_test(uint32_t length, size_t stride)
 {
@@ -186,8 +166,9 @@ int alloc_1D_test(uint32_t length, size_t stride)
         if (fd < 0)
                 return fd;
 
-	if (_ion_alloc_test(fd, &handle, &alloc_data))
-			return;
+	ret = _ion_alloc_test(fd, &handle, &alloc_data);
+		if (ret == -ENOMEM)
+			goto exit;
 
 	if (tiler_test)
               length = alloc_data.h * alloc_data.stride;
@@ -196,7 +177,6 @@ int alloc_1D_test(uint32_t length, size_t stride)
                 return;
 
         if (tiler_test)
-                _ion_tiler_map_test(ptr, &alloc_data);
 
 		 fill_mem(val, ptr, &alloc_data);
 		 check_mem(val, ptr, &alloc_data);
@@ -207,8 +187,10 @@ int alloc_1D_test(uint32_t length, size_t stride)
 		printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
 		return;
 	}
-	ion_close(fd);
+
 	close(map_fd);
+exit:
+	ion_close(fd);
 }
 
 int maxalloc_1D_test(uint32_t length, int max_allocs)
@@ -217,7 +199,6 @@ int maxalloc_1D_test(uint32_t length, int max_allocs)
 
     int fd, ret, map_fd;
     struct ion_handle *handle;
-    //uint32_t length;
     uint16_t *ptr;
 
     struct omap_ion_tiler_alloc_data alloc_data = {
@@ -258,7 +239,6 @@ int maxalloc_1D_test(uint32_t length, int max_allocs)
                 return;
 
         if (tiler_test)
-               // _ion_tiler_map_test(ptr, &alloc_data);
 
                  fill_mem(val, ptr, &alloc_data);
                  check_mem(val, ptr, &alloc_data);
@@ -303,8 +283,9 @@ int alloc_2D_test(uint32_t width, uint32_t height, int fmt)
                 return fd;
 
 
-        if (_ion_alloc_test(fd, &handle, &alloc_data))
-                        return;
+        ret = _ion_alloc_test(fd, &handle, &alloc_data);
+		if (ret == -ENOMEM)
+		   goto exit;
 
 	if (tiler_test)
               length = height * alloc_data.stride;
@@ -325,8 +306,9 @@ int alloc_2D_test(uint32_t width, uint32_t height, int fmt)
                 printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
                 return;
         }
-        ion_close(fd);
 	close(map_fd);
+exit:
+        ion_close(fd);
 }
 
 int maxalloc_2D_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
@@ -430,11 +412,12 @@ int alloc_NV12_test(uint32_t width, uint32_t height)
 	uint16_t val = (uint16_t) rand();
 
 
-        if (_ion_alloc_test(fd, &handle_y, &alloc_data_y))
-                        return;
-
-	if (_ion_alloc_test(fd, &handle_uv, &alloc_data_uv))
-                        return;
+        ret = _ion_alloc_test(fd, &handle_y, &alloc_data_y);
+        if (ret == -ENOMEM)
+           goto exit;
+	ret = _ion_alloc_test(fd, &handle_uv, &alloc_data_uv);
+        if (ret == -ENOMEM)
+	   goto exit;
 
         if (tiler_test)
               length1 = alloc_data_y.h * alloc_data_y.stride;
@@ -469,9 +452,11 @@ int alloc_NV12_test(uint32_t width, uint32_t height)
                 printf("%s failed: %s %p\n", __func__, strerror(ret), handle_uv);
                 return;
         }
-        ion_close(fd);
+
         close(map_fd1);
 	close(map_fd2);
+exit:
+	ion_close(fd);
 }
 
 int maxalloc_NV12_test(uint32_t width, uint32_t height, uint32_t max_allocs)
@@ -508,7 +493,6 @@ int maxalloc_NV12_test(uint32_t width, uint32_t height, uint32_t max_allocs)
 
     /* allocate as many buffers as we can */
     mem = (struct data *)calloc(max_allocs, sizeof(struct data));
-   // void *ptr = (void *)mem;
     int ix, res = 0;
     
 	for (ix = 0;  ix < max_allocs;) {
@@ -624,7 +608,7 @@ int map_1D_test(unsigned int length, size_t stride)
 	int fd, map_fd, ret;
 	size_t i;
 	struct ion_handle *handle;
-	unsigned char *ptr;
+	uint16_t *ptr;
  
         fd = ion_open();
         if (fd < 0)
@@ -641,7 +625,6 @@ int map_1D_test(unsigned int length, size_t stride)
 		return;
 
 	if (tiler_test)
-		_ion_tiler_map_test(ptr, &alloc_data);
 	
 	/* clean up properly */
 	munmap(ptr,length);
@@ -859,7 +842,6 @@ int negative_fmt_test(int fmt)
                 return;
 
         if (tiler_test)
-                _ion_tiler_map_test(ptr, &alloc_data);
 
                  fill_mem(val, ptr, &alloc_data);
                  check_mem(val, ptr, &alloc_data);
@@ -872,7 +854,6 @@ int negative_fmt_test(int fmt)
         }
 exit:
         ion_close(fd);
-     //   close(map_fd);
 }
 
 
@@ -904,7 +885,6 @@ int negative_1dl_test(int length)
                 return;
 
         if (tiler_test)
-                _ion_tiler_map_test(ptr, &alloc_data);
 
                  fill_mem(val, ptr, &alloc_data);
                  check_mem(val, ptr, &alloc_data);
@@ -917,7 +897,6 @@ int negative_1dl_test(int length)
         }
 exit:
         ion_close(fd);
-     //   close(map_fd);
 }
 
 int negative_1dh_test(int height)
@@ -948,7 +927,6 @@ int negative_1dh_test(int height)
                 return;
 
         if (tiler_test)
-                _ion_tiler_map_test(ptr, &alloc_data);
 
                  fill_mem(val, ptr, &alloc_data);
                  check_mem(val, ptr, &alloc_data);
@@ -961,7 +939,6 @@ int negative_1dh_test(int height)
         }
 exit:
         ion_close(fd);
-     //   close(map_fd);
 }
 
 int negative_2d_test(uint32_t width, uint32_t height, int fmt)
@@ -994,7 +971,6 @@ int negative_2d_test(uint32_t width, uint32_t height, int fmt)
                 return;
 
         if (tiler_test)
- //               _ion_tiler_map_test(ptr, &alloc_data);
                 fill_mem(val, ptr, &alloc_data);
                 check_mem(val, ptr, &alloc_data);
 
@@ -1008,7 +984,6 @@ int negative_2d_test(uint32_t width, uint32_t height, int fmt)
         }
 exit:
         ion_close(fd);
-     //   close(map_fd);
 }
 
 int negative_free_2D_test(uint32_t width, uint32_t height, int fmt)
@@ -1040,7 +1015,6 @@ int negative_free_2D_test(uint32_t width, uint32_t height, int fmt)
                 return;
 
         if (tiler_test)
- //               _ion_tiler_map_test(ptr, &alloc_data);
                 fill_mem(val, ptr, &alloc_data);
                 check_mem(val, ptr, &alloc_data);
 
@@ -1089,7 +1063,6 @@ int negative_free_1D_test(uint32_t length, size_t stride)
                 return;
 
         if (tiler_test)
-                _ion_tiler_map_test(ptr, &alloc_data);
 
                  fill_mem(val, ptr, &alloc_data);
                  check_mem(val, ptr, &alloc_data);
@@ -1106,7 +1079,6 @@ int negative_free_1D_test(uint32_t length, size_t stride)
         }
 exit:
         ion_close(fd);
-        close(map_fd);
 }
 
 int negative_arbitvalue_test(uint32_t length, size_t stride)
@@ -1136,7 +1108,6 @@ int negative_arbitvalue_test(uint32_t length, size_t stride)
                 return;
 
         if (tiler_test)
-                _ion_tiler_map_test(ptr, &alloc_data);
 
                  fill_mem(val, ptr, &alloc_data);
                  check_mem(val, ptr, &alloc_data);
@@ -1151,7 +1122,6 @@ int negative_arbitvalue_test(uint32_t length, size_t stride)
         }
 exit:
         ion_close(fd);
-        close(map_fd);
 }
 
 int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
@@ -1190,7 +1160,6 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
     int res = 0, ix;
     while (num_ops--)
     {
-	printf("++++++++number of ops =%d++++++++\n", num_ops);
         ix = rand() % num_slots;
         /* see if we need to free/unmap data */
         if (mem[ix].bufPtr) 
@@ -1269,12 +1238,10 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                                 ion_close(map_fd);
 
 		printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix,mem[ix].stride, alloc_data.fmt, mem[ix].height, mem[ix].width);
-	//	alloc_1D(mem[ix].length, 0, mem[ix].val);
         //        P("alloc[l=0x%x] = %p", mem[ix].length, mem[ix].bufPtr);
                 break;
             case 2:
 		alloc_data.fmt = TILER_PIXEL_FMT_8BIT;
-	//	printf("**********in case 2*************\n");
 		ret = _ion_alloc_test(fd, &handle, &alloc_data);
                 if (ret == -EINVAL)
 			goto exit;
@@ -1294,7 +1261,6 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                                 ion_close(map_fd);
 
 		printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, alloc_data.fmt, mem[ix].height, mem[ix].width);
-	//	printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, mem[ix].fmt);
         //        P("alloc[%d*%d*8] = %p", mem[ix].width, mem[ix].height, mem[ix].bufPtr);
                 break;
             case 3:
@@ -1316,7 +1282,6 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                                 munmap(ptr, length);
                                 ion_close(map_fd);
 
-	//	printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, mem[ix].fmt);
 		printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, alloc_data.fmt, mem[ix].height, mem[ix].width);
               //  P("alloc[%d*%d*16] = %p", mem[ix].width, mem[ix].height, mem[ix].bufPtr);
                 break;
@@ -1337,11 +1302,8 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                                 fill_mem(val, ptr, &alloc_data);
                                 check_mem(val, ptr, &alloc_data);
                                 munmap(ptr, length);
-                         //       ion_free(mem[ix].fd1, mem[ix].bufPtr);
-        //                      ion_close(mem[ix].fd1);
                                 ion_close(map_fd);
 
-		//printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, mem[ix].fmt);
           	printf("value of mem[ix].bufPtr=%x, ix=%x, stride=%d fmt=%d h=%d w=%d \n", mem[ix].bufPtr, ix, mem[ix].stride, alloc_data.fmt, mem[ix].height, mem[ix].width);
               //  P("alloc[%d*%d*32] = %p", mem[ix].width, mem[ix].height, mem[ix].bufPtr);
                 break;
@@ -1426,7 +1388,6 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                 			return;
 
         	//	if (tiler_test)
-                //		_ion_tiler_map_test(ptr, &alloc_data);
 
                  		fill_mem(val, ptr, &alloc_data);
                  		check_mem(val, ptr, &alloc_data);
@@ -1498,7 +1459,6 @@ int negative_arbitvalue_test(uint32_t length, size_t stride)
                 return;
 
         if (tiler_test)
-                _ion_tiler_map_test(ptr, &alloc_data);
 
                  fill_mem(val, ptr, &alloc_data);
                  check_mem(val, ptr, &alloc_data);
