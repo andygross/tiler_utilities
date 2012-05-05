@@ -24,13 +24,13 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
 
 //#define LOG_TAG "ion"
 //#include <cutils/log.h>
 
 #include "ion_user.h"
-
-static int usage_count;
 
 int ion_open()
 {
@@ -143,7 +143,6 @@ int ion_map(int fd, struct ion_handle *handle, size_t length, int prot,
 
 int ion_share(int fd, struct ion_handle *handle, int *share_fd)
 {
-        int map_fd;
         struct ion_fd_data data = {
                 .handle = handle,
         };
