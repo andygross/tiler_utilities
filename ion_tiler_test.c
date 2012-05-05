@@ -177,6 +177,7 @@ int alloc_1D_test(uint32_t length, size_t stride)
 	if (tiler_test)
 		length = alloc_data.h * alloc_data.stride;
 
+	printf("mapping %d \n", length);
 	ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
         if (ret)
 		return;
@@ -207,6 +208,7 @@ int maxalloc_1D_test(uint32_t length, int max_allocs)
 		.w = length,
 		.h = 1,
 		.fmt = TILER_PIXEL_FMT_PAGE,
+		.out_align = PAGE_SIZE,
 	};
 
 	struct data {
@@ -277,6 +279,7 @@ int alloc_2D_test(uint32_t width, uint32_t height, int fmt)
 		.w = width,
 		.h = height,
 		.fmt = fmt,
+		.out_align = PAGE_SIZE,
 	};
 
 	uint16_t val = (uint16_t) rand();
@@ -305,6 +308,7 @@ int alloc_2D_test(uint32_t width, uint32_t height, int fmt)
 	close(map_fd);
 exit:
         ion_close(fd);
+	return ret;
 }
 
 int maxalloc_2D_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
@@ -318,6 +322,7 @@ int maxalloc_2D_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
 		.w = width,
 		.h = height,
 		.fmt = fmt,
+		.out_align = PAGE_SIZE,
 	};
 
 	struct data {
@@ -395,6 +400,7 @@ int maxalloc_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
                 .w = width,
                 .h = height,
                 .fmt = fmt,
+		.out_align = PAGE_SIZE,
         };
 
         struct data {
@@ -508,12 +514,14 @@ int alloc_NV12_test(uint32_t width, uint32_t height)
                 .w = width,
                 .h = height,
                 .fmt = TILER_PIXEL_FMT_8BIT,
+		.out_align = PAGE_SIZE,
         };
 
 	struct omap_ion_tiler_alloc_data alloc_data_uv = {
                 .w = width >> 1,
                 .h = height >> 1,
                 .fmt = TILER_PIXEL_FMT_16BIT,
+		.out_align = PAGE_SIZE,
         };	
 	
 
@@ -582,12 +590,14 @@ int maxalloc_NV12_test(uint32_t width, uint32_t height, uint32_t max_allocs)
                 .w = width,
                 .h = height,
                 .fmt = TILER_PIXEL_FMT_8BIT,
+		.out_align = PAGE_SIZE,
         };
 
         struct omap_ion_tiler_alloc_data alloc_data_uv = {
                 .w = width >> 1,
                 .h = height >> 1,
                 .fmt = TILER_PIXEL_FMT_16BIT,
+		.out_align = PAGE_SIZE,
         };
 
 	struct data {
@@ -621,7 +631,7 @@ int maxalloc_NV12_test(uint32_t width, uint32_t height, uint32_t max_allocs)
 		{
 			mem[ix].bufPtr1 = handle_y;
 			mem[ix].bufPtr2 = handle_uv;
-			printf("handle allocated count = %d handle_y =%x \ 
+			printf("handle allocated count = %d handle_y =%x \
 				handle_uv= %x\n", ix, mem[ix].bufPtr1, mem[ix].bufPtr2);
 			ix++;
 		}
@@ -867,6 +877,7 @@ int check_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *a
                     		printf("assert: val[%u,%u] (=0x%x) != 0x%x", r, i, *--ptr32, val);
                     		return -EINVAL;
                 		}
+				ptr32++;
                 		start += delta;
                 		delta += step;
                 		/* increase step if overflown */
@@ -896,6 +907,7 @@ int check_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *a
                     		printf("assert: val[%u,%u] (=0x%x) != 0x%x", r, i, *--ptr, start);
                     		return -EINVAL;
                 		}
+				ptr++;
                 		start += delta;
                 		delta += step;
                 		/* increase step if overflown */
@@ -1218,7 +1230,7 @@ int negative_arbitvalue_test(uint32_t length, size_t stride)
                  check_mem(val, ptr, &alloc_data);
 
         munmap(ptr, length);
-        ret = ion_free(fd, 0x12345678);
+        ret = ion_free(fd, (struct ion_handle *)0x12345678);
         if (ret == -EINVAL)
 		goto exit;
         if (ret) {
@@ -1251,7 +1263,7 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
 	uint32_t length, length1, length2;
 	uint16_t val;
  
-	struct omap_ion_tiler_alloc_data alloc_data;
+	struct omap_ion_tiler_alloc_data alloc_data = {0};
 
 	fd = ion_open();
 	if (fd < 0)
@@ -1348,6 +1360,7 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                 	      break;
             		case 2:
 			      alloc_data.fmt = TILER_PIXEL_FMT_8BIT;
+                              alloc_data.out_align = PAGE_SIZE;
 			      ret = _ion_alloc_test(fd, &handle, &alloc_data);
                 	      if (ret == -EINVAL)
 					goto exit;
@@ -1372,6 +1385,7 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                 	      break;
 			case 3:
 			      alloc_data.fmt = TILER_PIXEL_FMT_16BIT;
+                              alloc_data.out_align = PAGE_SIZE;
                 	      ret = _ion_alloc_test(fd, &handle, &alloc_data);
                 	      if (ret == -EINVAL)
 					goto exit;
@@ -1395,6 +1409,7 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                 	      break;
 			case 4:
 			      alloc_data.fmt = TILER_PIXEL_FMT_32BIT;
+                              alloc_data.out_align = PAGE_SIZE;
                 	      ret = _ion_alloc_test(fd, &handle, &alloc_data);
 		 	      if (ret == -EINVAL)
 					goto exit;
@@ -1417,12 +1432,14 @@ int random_alloc_test(uint32_t num_ops, uint16_t num_slots)
                 	      break;
             		case 5:
 			      alloc_data.fmt = TILER_PIXEL_FMT_8BIT;
+                              alloc_data.out_align = PAGE_SIZE;
 			      mem[ix].height = alloc_data.h;
                 	      mem[ix].width = alloc_data.w;
 			      struct omap_ion_tiler_alloc_data alloc_data_uv = {
                 			.w = mem[ix].width >> 1,
                 		        .h = mem[ix].height >> 1,
                 	 	        .fmt = TILER_PIXEL_FMT_16BIT,
+					.out_align = PAGE_SIZE,
 			      };
 
         		      ret = _ion_alloc_test(fd, &handle, &alloc_data);
