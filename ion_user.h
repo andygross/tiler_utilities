@@ -137,6 +137,7 @@ struct ion_allocation_data {
 struct ion_fd_data {
 	struct ion_handle *handle;
 	int fd;
+	unsigned char cacheable;
 };
 
 /**
@@ -217,6 +218,11 @@ struct ion_custom_data {
  * passes appropriate userdata for that ioctl
  */
 #define ION_IOC_CUSTOM		_IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)
+
+#define ION_IOC_FLUSH_CACHED    _IOWR(ION_IOC_MAGIC, 7, \
+                                        struct ion_cached_user_buf_data)
+#define ION_IOC_INVAL_CACHED    _IOWR(ION_IOC_MAGIC, 8, \
+                                        struct ion_cached_user_buf_data)
 
 
 int ion_open();
