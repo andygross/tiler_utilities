@@ -21,6 +21,8 @@ int alloc_flags = 0;
 int test = -1;
 size_t stride;
 
+static int verbose;
+
 #define PAGE_SIZE 0x1000
 #define MAX_ALLOCS 512
 
@@ -122,8 +124,8 @@ size_t stride;
    T(negative_free_2D_test(1920, 1080, TILER_PIXEL_FMT_16BIT)) \
    T(negative_free_1D_test(176 * 144 * 2, 0)) \
    T(negative_arbitvalue_test(176 * 144 * 2, 0)) \
-   T(random_alloc_test(1000,10)) \
-   T(maxalloc_test(1920, 1080, TILER_PIXEL_FMT_16BIT, MAX_ALLOCS))
+   T(random_alloc_test(1000,10))
+//   T(maxalloc_test(1920, 1080, TILER_PIXEL_FMT_16BIT, MAX_ALLOCS))
 
 int check_mem(uint16_t start, uint16_t *ptr, 
 	      struct omap_ion_tiler_alloc_data *al_data);
@@ -134,10 +136,9 @@ int _ion_alloc_test(int fd, struct ion_handle **handle,
 		    struct omap_ion_tiler_alloc_data *al_data)
 {
 	int ret;
+
 	ret = ion_alloc_tiler(fd, &al_data, handle, &stride);
 
-	if (ret)
-		printf("%s failed: %s\n", __func__, strerror(ret));
 	return ret;
 }
 
@@ -164,13 +165,19 @@ int alloc_1D_test(uint32_t length, size_t stride)
 
 	length = alloc_data.h * alloc_data.stride;
 
-	printf("mapping %d \n", length);
+	if (verbose)
+	        printf("mapping %d \n", length);
 	ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
         if (ret)
 		return ret;
 
 	fill_mem(val, ptr, &alloc_data);
-	check_mem(val, ptr, &alloc_data);
+	ret  = check_mem(val, ptr, &alloc_data);
+	if (ret) {
+		printf("%s: memory validation failed\n", __func__);
+		munmap(ptr, length);
+		goto exit;
+	}
 
 	munmap(ptr, length);
 	ret = ion_free(fd, handle);
@@ -222,8 +229,9 @@ int maxalloc_1D_test(uint32_t length, int max_allocs)
 
 		if (handle) {
 			mem[ix].bufPtr = handle;
-			printf("handle allocated count = %d handle =%p\n",
-				ix, mem[ix].bufPtr);
+			if (verbose)
+			    printf("handle allocated count = %d handle =%p\n",
+					ix, mem[ix].bufPtr);
 			length = alloc_data.h * alloc_data.stride;
         		ret = ion_map(fd, handle, length, prot, map_flags, 0, 
 				&ptr, &map_fd);
@@ -243,8 +251,9 @@ int maxalloc_1D_test(uint32_t length, int max_allocs)
 exit:
 	while (ix--)
 	{	
-		printf("handle de-allocated count = %d handle =%p\n", ix, 
-			mem[ix].bufPtr);
+		if (verbose)
+		     printf("handle de-allocated count = %d handle =%p\n", ix, 
+				mem[ix].bufPtr);
 		ret = ion_free(fd,  mem[ix].bufPtr);
 		if (ret) {
                 	printf("%s failed: %s %p\n", __func__, strerror(ret),
@@ -276,16 +285,22 @@ int alloc_2D_test(uint32_t width, uint32_t height, int fmt)
 		return fd;
 
 	ret = _ion_alloc_test(fd, &handle, &alloc_data);
-		if (ret)
-			goto exit;
+	if (ret)
+		goto exit;
 
 	length = height * alloc_data.stride;
 	ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
 	if (ret)
-                return ret;
+                goto exit;
 
 	fill_mem(val, ptr, &alloc_data);
-	check_mem(val, ptr, &alloc_data);
+	ret = check_mem(val, ptr, &alloc_data);
+	if (ret) {
+		printf("%s: memory validation failed\n", __func__);
+		munmap(ptr, length);
+		goto exit;
+
+	}
 
 	munmap(ptr, length);
         ret = ion_free(fd, handle);
@@ -335,8 +350,9 @@ int maxalloc_2D_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
 
 		if (handle) {
             		mem[ix].bufPtr = handle;
-	    		printf("handle allocated count = %d handle =%p\n", ix, 
-				mem[ix].bufPtr);
+			if (verbose)
+	    		    printf("handle allocated count = %d handle =%p\n",
+					ix, mem[ix].bufPtr);
 			length = height * alloc_data.stride;
            		ret = ion_map(fd, handle, length, prot, map_flags, 0, 
 					&ptr, &map_fd);
@@ -358,8 +374,9 @@ exit:
 	while (ix--)
 	{
 		ret = ion_free(fd, mem[ix].bufPtr);
-		printf("handle de-allocated count = %d handle =%p\n", ix, 
-			mem[ix].bufPtr);
+		if (verbose)
+		    printf("handle de-allocated count = %d handle =%p\n", ix, 
+				mem[ix].bufPtr);
 		if (ret) {
 			printf("%s failed: %s %p\n", __func__, strerror(ret), 
 				handle);
@@ -413,8 +430,9 @@ int maxalloc_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
 
                 if (handle) {
                         mem_1d[ix].bufPtr = handle;
-                        printf("handle allocated count = %d handle =%p\n", ix,
-                                mem_1d[ix].bufPtr);
+			if (verbose)
+                              printf("handle allocated count = %d handle =%p\n",
+				     ix, mem_1d[ix].bufPtr);
                         length = alloc_data.h * alloc_data.stride;
                         ret = ion_map(fd, handle, length, prot, map_flags, 0,
                                         &ptr, &map_fd);
@@ -442,8 +460,9 @@ int maxalloc_test(uint32_t width, uint32_t height, int fmt, int max_allocs)
 
                 if (handle) {
                         mem_2d[ix_2d].bufPtr = handle;
-                        printf("handle allocated count = %d handle =%p\n", ix_2d,
-                                mem_2d[ix_2d].bufPtr);
+			if (verbose)
+                              printf("handle allocated count = %d handle =%p\n",
+					 ix_2d, mem_2d[ix_2d].bufPtr);
                         length = height * alloc_data_2d.stride;
                         ret = ion_map(fd, handle, length, prot, map_flags, 0,
                                         &ptr, &map_fd);
@@ -464,21 +483,24 @@ exit_1d:
         while (ix--)
         {
                 ret = ion_free(fd, mem_1d[ix].bufPtr);
-                printf("handle de-allocated count = %d handle =%p\n", ix,
-                        mem_1d[ix].bufPtr);
                 if (ret) {
                         printf("%s failed: %s %p\n", __func__, strerror(ret),
                                 handle);
                         return ret;
                 }
+
+		if (verbose)
+                    printf("handle de-allocated count = %d handle =%p\n", ix,
+                   	     mem_1d[ix].bufPtr);
         }
         free(mem_1d);
 exit_2d:
         while (ix_2d--)
         {
                 ret = ion_free(fd, mem_2d[ix].bufPtr);
-                printf("handle de-allocated count = %d handle =%p\n", ix,
-                        mem_2d[ix].bufPtr);
+		if (verbose)
+                    printf("handle de-allocated count = %d handle =%p\n", ix,
+                   	     mem_2d[ix].bufPtr);
                 if (ret) {
                         printf("%s failed: %s %p\n", __func__, strerror(ret),
                                 handle);
@@ -618,8 +640,10 @@ int maxalloc_NV12_test(uint32_t width, uint32_t height, uint32_t max_allocs)
 		{
 			mem[ix].bufPtr1 = handle_y;
 			mem[ix].bufPtr2 = handle_uv;
-			printf("handle allocated count = %d handle_y =%p \
-				handle_uv= %p\n", ix, mem[ix].bufPtr1, mem[ix].bufPtr2);
+			if (verbose)
+			      printf("handle allocated count = %d handle_y =%p \
+				     handle_uv= %p\n", ix, mem[ix].bufPtr1,
+                                     mem[ix].bufPtr2);
 			ix++;
 		}
 	}
@@ -652,7 +676,9 @@ exit:
                 	printf("%s failed: %s %p\n", __func__, strerror(ret), mem[ix].bufPtr2);
                 	return ret;
             	}
-		printf("handle de-allocate count=%d handle_y=%p handle_uv=%p\n",
+		if (verbose)
+		    printf("handle de-allocate count=%d handle_y=%p \
+				handle_uv=%p\n",
 				 ix, mem[ix].bufPtr1, mem[ix].bufPtr2);
 	}
         ion_close(fd);
@@ -741,9 +767,10 @@ void fill_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *a
     	}
     	width *= def_bpp(al_data->fmt);
 
-	printf("%p,%d*%d,s=%d stval=0x%x", al_data->handle, width, height, stride, start);
+	if (verbose)
+		printf("%p,%d*%d,s=%d stval=0x%x\n", al_data->handle, width,
+			height, stride, start);
 
-	// CHK_I(width,<=,stride);
 	uint32_t *ptr32 = (uint32_t *)ptr;
 	while (height--)
     	{
@@ -771,21 +798,17 @@ void fill_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *a
                 		*ptr++ = start;
                 		start += delta;
                 		delta += step;
-//		printf("++++++value of ptr=%x start=%d delta=%d\n", ptr, *ptr, delta);
                 /* increase step if overflown */
                 	if (delta < step) delta = ++step;
             		}
             		ptr += (stride - i) / sizeof(uint16_t);
 		}	
     	}
-   	// CHK_P((block->pixelFormat == PIXEL_FMT_32BIT ? (void *)ptr32 : (void *)ptr),==,
-     	//     (block->ptr + size));
-  	//  OUT;
 }
 
 int check_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *al_data)
 {
-   //uint8_t *ptr8 = (uint8_t *)ptr; 
+   //uint8_t *ptr8 = (y validation failed\n", __func__);uint8_t *)ptr; 
 	uint16_t delta = 1, step = 1;
 	uint32_t height, width, stride, r, i;
 	if (al_data->fmt == TILER_PIXEL_FMT_PAGE)
@@ -839,15 +862,14 @@ int check_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *a
 		ptr += (stride - i) / sizeof(uint16_t);
         	}
 	}
-    	return -EINVAL;
+    	return 0;
 }
 
 
 int negative_1dl_test(int length)
 {
-        int fd, map_fd, ret;
+        int fd, ret;
         struct ion_handle *handle;
-        uint16_t *ptr;
 
         struct omap_ion_tiler_alloc_data alloc_data = {
                 .w = length,
@@ -855,39 +877,23 @@ int negative_1dl_test(int length)
                 .fmt = TILER_PIXEL_FMT_PAGE,
         };
 
-        uint16_t val = (uint16_t) rand();
         fd = ion_open();
         if (fd < 0)
                 return fd;
 
         ret = _ion_alloc_test(fd, &handle, &alloc_data);
-                if (ret == -EINVAL)
-                        goto exit;
 
-        length = alloc_data.h * alloc_data.stride;
-        ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
-        if (ret)
-                return ret;
+	/* Failure is expected here.  So if an error is set, return 0 */
+	ret = (ret) ? 0 : 1;
 
-        fill_mem(val, ptr, &alloc_data);
-        check_mem(val, ptr, &alloc_data);
-
-        munmap(ptr, length);
-        ret = ion_free(fd, handle);
-        if (ret) {
-                printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
-                return ret;
-        }
-exit:
         ion_close(fd);
 	return ret;
 }
 
 int negative_1dh_test(int height)
 {
-        int fd, map_fd, ret, length;
+        int fd, ret;
         struct ion_handle *handle;
-        uint16_t *ptr;
 
         struct omap_ion_tiler_alloc_data alloc_data = {
                 .w = 4096,
@@ -895,39 +901,19 @@ int negative_1dh_test(int height)
                 .fmt = TILER_PIXEL_FMT_PAGE,
         };
 
-        uint16_t val = (uint16_t) rand();
         fd = ion_open();
         if (fd < 0)
                 return fd;
 
         ret = _ion_alloc_test(fd, &handle, &alloc_data);
-                if (ret == -EINVAL)
-                        goto exit;
 
-        length = alloc_data.h * alloc_data.stride;
-        ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
-        if (ret)
-                return ret;
-
-        fill_mem(val, ptr, &alloc_data);
-        check_mem(val, ptr, &alloc_data);
-
-        munmap(ptr, length);
-        ret = ion_free(fd, handle);
-        if (ret) {
-                printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
-                return ret;
-        }
-exit:
         ion_close(fd);
-	return ret;
+	return !ret;
 }
 
 int negative_2d_test(uint32_t width, uint32_t height, int fmt)
 {
-        int fd, map_fd, ret;
-        uint32_t length;
-        uint16_t *ptr;
+        int fd, ret;
         struct ion_handle *handle;
         struct omap_ion_tiler_alloc_data alloc_data = {
                 .w = height,
@@ -936,93 +922,55 @@ int negative_2d_test(uint32_t width, uint32_t height, int fmt)
 		.out_align = PAGE_SIZE,
         };
 
-        uint16_t val = (uint16_t) rand();
-
         fd = ion_open();
         if (fd < 0)
                 return fd;
 
-
         ret = _ion_alloc_test(fd, &handle, &alloc_data);
-		if (ret == -EINVAL)
-			goto exit; 
 
-        length = height * alloc_data.stride;
-        ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
-        if (ret)
-                return ret;
-
-        fill_mem(val, ptr, &alloc_data);
-        check_mem(val, ptr, &alloc_data);
-
-
-        munmap(ptr, length);
-
-        ret = ion_free(fd, handle);
-        if (ret) {
-                printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
-                return ret;
-        }
-exit:
         ion_close(fd);
-	return ret;
+	return !ret;
 }
 
 int negative_free_2D_test(uint32_t width, uint32_t height, int fmt)
 {
-        int fd, map_fd, ret;
-        uint32_t length;
-        uint16_t *ptr;
+        int fd, ret;
         struct ion_handle *handle;
         struct omap_ion_tiler_alloc_data alloc_data = {
-                .w = height,
+                .w = width,
                 .h = height,
                 .fmt = 0,
         };
-
-        uint16_t val = (uint16_t) rand();
 
         fd = ion_open();
         if (fd < 0)
                 return fd;
 
-
 	ret = _ion_alloc_test(fd, &handle, &alloc_data);
 	if (ret)
-		return ret;
-
-        length = height * alloc_data.stride;
-        ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
-        if (ret)
-                return ret;
-
-        fill_mem(val, ptr, &alloc_data);
-        check_mem(val, ptr, &alloc_data);
-
-
-        munmap(ptr, length);
+		goto exit;
 
         ret = ion_free(fd, handle);
-	printf("return value from ion_free = %d\n",ret);
+	if (ret)
+		goto exit;
+
+	/* double free the handle to get a failure */
 	ret = ion_free(fd, handle);
-        if (ret == -EINVAL)
-		goto exit;//printf("return value from ion_free = %d\n",ret);
-        if (ret) {
-                printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
-                return ret;
-        }
+	ret = (ret == -EINVAL) ? 0 : ret;
+
 exit:
+	if (ret)
+                printf("%s: %s\n", __func__, strerror(ret));
+
         ion_close(fd);
-        close(map_fd);
 	return ret;
 }
 
 
 int negative_free_1D_test(uint32_t length, size_t stride)
 {
-        int fd, map_fd, ret;
+        int fd, ret;
         struct ion_handle *handle;
-        uint16_t *ptr;
 
         struct omap_ion_tiler_alloc_data alloc_data = {
                 .w = length,
@@ -1030,42 +978,33 @@ int negative_free_1D_test(uint32_t length, size_t stride)
                 .fmt = TILER_PIXEL_FMT_PAGE,
         };
 
-        uint16_t val = (uint16_t) rand();
         fd = ion_open();
         if (fd < 0)
                 return fd;
 
 	ret = _ion_alloc_test(fd, &handle, &alloc_data);
-                        return ret;
+	if (ret)
+        	goto exit;
 
-        length = alloc_data.h * alloc_data.stride;
-        ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
-        if (ret)
-                return ret;
-
-        fill_mem(val, ptr, &alloc_data);
-        check_mem(val, ptr, &alloc_data);
-
-        munmap(ptr, length);
         ret = ion_free(fd, handle);
-	ret = ion_free(fd, handle);
-	if (ret == -EINVAL)
+	if (ret)
 		goto exit;
 
-        if (ret) {
-                printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
-                return ret;
-        }
+	ret = ion_free(fd, handle);
+	ret = (ret == -EINVAL) ? 0 : ret;
+
 exit:
+        if (ret)
+                printf("%s: %s\n", __func__, strerror(ret));
+
         ion_close(fd);
 	return ret;
 }
 
 int negative_arbitvalue_test(uint32_t length, size_t stride)
 {
-        int fd, map_fd, ret;
+        int fd, ret;
         struct ion_handle *handle;
-        uint16_t *ptr;
 
         struct omap_ion_tiler_alloc_data alloc_data = {
                 .w = length,
@@ -1073,31 +1012,21 @@ int negative_arbitvalue_test(uint32_t length, size_t stride)
                 .fmt = TILER_PIXEL_FMT_PAGE,
         };
 
-        uint16_t val = (uint16_t) rand();
         fd = ion_open();
         if (fd < 0)
                 return fd;
 
 	ret = _ion_alloc_test(fd, &handle, &alloc_data);
-		return ret;
-
-        length = alloc_data.h * alloc_data.stride;
-        ret = ion_map(fd, handle, length, prot, map_flags, 0, &ptr, &map_fd);
-        if (ret)
-                return ret;
-
-        fill_mem(val, ptr, &alloc_data);
-        check_mem(val, ptr, &alloc_data);
-
-        munmap(ptr, length);
-        ret = ion_free(fd, (struct ion_handle *)0x12345678);
-        if (ret == -EINVAL)
+	if (ret)
 		goto exit;
-        if (ret) {
-                printf("%s failed: %s %p\n", __func__, strerror(ret), handle);
-                return ret;
-        }
+
+        ret = ion_free(fd, (struct ion_handle *)0x12345678);
+	ret = (ret == -EINVAL) ? 0 : ret;
+
 exit:
+        if (ret)
+                printf("%s: %s\n", __func__, strerror(ret));
+
         ion_close(fd);
 	return ret;
 }
