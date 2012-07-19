@@ -26,6 +26,10 @@ static int verbose;
 #define PAGE_SIZE 0x1000
 #define MAX_ALLOCS 512
 
+static int env_offset;
+static int env_align = PAGE_SIZE;
+static int env_sleep;
+
 #define TESTS\
     T(alloc_1D_test(4096, 0))\
     T(alloc_1D_test(176 * 144 * 2, 0))\
@@ -50,6 +54,7 @@ static int verbose;
     T(alloc_2D_test(1920, 1080, TILER_PIXEL_FMT_16BIT))\
     T(alloc_2D_test(1920, 1080, TILER_PIXEL_FMT_32BIT))\
     T(alloc_2D_test(1080, 1920, TILER_PIXEL_FMT_32BIT))\
+    T(alloc_2D_test(3840, 2160, TILER_PIXEL_FMT_32BIT))\
     T(alloc_2D_test(8193, 16, TILER_PIXEL_FMT_8BIT))\
     T(alloc_2D_test(8193, 16, TILER_PIXEL_FMT_16BIT))\
     T(alloc_2D_test(4097, 16, TILER_PIXEL_FMT_32BIT))\
@@ -276,7 +281,8 @@ int alloc_2D_test(uint32_t width, uint32_t height, int fmt)
 		.w = width,
 		.h = height,
 		.fmt = fmt,
-		.out_align = PAGE_SIZE,
+		.out_align = env_align,
+		.offset = env_offset,
 	};
 
 	uint16_t val = (uint16_t) rand();
@@ -293,6 +299,8 @@ int alloc_2D_test(uint32_t width, uint32_t height, int fmt)
 	if (ret)
                 goto exit;
 
+	if(env_sleep)
+		sleep(env_sleep);
 	fill_mem(val, ptr, &alloc_data);
 	ret = check_mem(val, ptr, &alloc_data);
 	if (ret) {
@@ -524,16 +532,17 @@ int alloc_NV12_test(uint32_t width, uint32_t height)
                 .w = width,
                 .h = height,
                 .fmt = TILER_PIXEL_FMT_8BIT,
-		.out_align = PAGE_SIZE,
+		.out_align = 128,
+		.offset = -1,
         };
 
 	struct omap_ion_tiler_alloc_data alloc_data_uv = {
                 .w = width >> 1,
                 .h = height >> 1,
                 .fmt = TILER_PIXEL_FMT_16BIT,
-		.out_align = PAGE_SIZE,
+		.out_align = 128,
         };	
-	
+
 
         fd = ion_open();
         if (fd < 0)
@@ -545,6 +554,8 @@ int alloc_NV12_test(uint32_t width, uint32_t height)
         ret = _ion_alloc_test(fd, &handle_y, &alloc_data_y);
         if (ret)
            goto exit;
+
+	alloc_data_uv.offset = alloc_data_y.offset;
 	ret = _ion_alloc_test(fd, &handle_uv, &alloc_data_uv);
         if (ret)
 	   goto exit;
@@ -559,6 +570,9 @@ int alloc_NV12_test(uint32_t width, uint32_t height)
 	ret = ion_map(fd, handle_uv, length2, prot, map_flags, 0, &ptr2, &map_fd2);
 	if (ret)
 		return ret;
+
+	if (env_sleep)
+		sleep(env_sleep);
 
 	fill_mem(val, ptr1, &alloc_data_y);
         check_mem(val, ptr1, &alloc_data_y);
@@ -766,7 +780,7 @@ void fill_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *a
         	stride = al_data->stride;
     	}
     	width *= def_bpp(al_data->fmt);
-
+	ptr += al_data->offset / sizeof(uint16_t);
 	if (verbose)
 		printf("%p,%d*%d,s=%d stval=0x%x\n", al_data->handle, width,
 			height, stride, start);
@@ -801,9 +815,19 @@ void fill_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *a
                 /* increase step if overflown */
                 	if (delta < step) delta = ++step;
             		}
-            		ptr += (stride - i) / sizeof(uint16_t);
-		}	
+			ptr += (stride - i) / sizeof(uint16_t);
+		}
     	}
+
+#if 0
+	printf("%p: ", start_ptr);
+	for(i=0; i < 2048; i++){
+		if (i && ((uint32_t)start_ptr % 32 == 0) )
+			printf("\n%p: ", start_ptr);
+		printf("%04x", *start_ptr++);
+	}
+			printf("\n");
+#endif
 }
 
 int check_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *al_data)
@@ -823,6 +847,7 @@ int check_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *a
     	}
     	width *= def_bpp(al_data->fmt);
 
+	ptr += al_data->offset / sizeof(uint16_t);
    // CHK_I(width,<=,stride);
 	uint32_t *ptr32 = (uint32_t *)ptr;
 	for (r = 0; r < height; r++)
@@ -859,7 +884,7 @@ int check_mem(uint16_t start, uint16_t *ptr, struct omap_ion_tiler_alloc_data *a
                 		/* increase step if overflown */
                 		if (delta < step) delta = ++step;
             		}
-		ptr += (stride - i) / sizeof(uint16_t);
+			ptr += (stride - i) / sizeof(uint16_t);
         	}
 	}
     	return 0;
@@ -1334,6 +1359,21 @@ void memmgr_identity_test(void *ptr)
  */
 int main(int argc, char **argv)
 {
+	char *env_var;
+
+	env_var = getenv("TILER_VERBOSE");
+	if (env_var)
+		verbose = 1;
+	env_var = getenv("TILER_SLEEP");
+	if (env_var)
+		env_sleep = atoi(env_var);
+	env_var = getenv("TILER_ALIGN");
+	if (env_var)
+		env_align = atoi(env_var);
+	env_var = getenv("TILER_OFFSET");
+	if (env_var)
+		env_offset = atoi(env_var);
+
     return TestLib_Run(argc, argv,
                        memmgr_identity_test, memmgr_identity_test, NULL);
 }
