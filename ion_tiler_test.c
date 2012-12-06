@@ -61,6 +61,7 @@ static int env_sleep;
     T(alloc_2D_test(16384, 16, TILER_PIXEL_FMT_8BIT))\
     T(alloc_2D_test(16384, 16, TILER_PIXEL_FMT_16BIT))\
     T(alloc_2D_test(8192, 16, TILER_PIXEL_FMT_32BIT))\
+    T(alloc_2D_test(8192, 256, TILER_PIXEL_FMT_32BIT))\
     T(!alloc_2D_test(16385, 16, -1))\
     T(!alloc_2D_test(16385, 16, 8))\
     T(!alloc_2D_test(16385, 16, TILER_PIXEL_FMT_8BIT))\
