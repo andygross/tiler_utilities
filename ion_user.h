@@ -76,6 +76,7 @@ int omap_tiler_pages(struct ion_client *client, struct ion_handle *handle,
 /* additional heaps used only on omap */
 enum {
 	OMAP_ION_HEAP_TYPE_TILER = ION_HEAP_TYPE_CUSTOM + 1,
+        OMAP_ION_HEAP_TYPE_TILER_RESERVATION,
 };
 
 #define OMAP_ION_HEAP_TILER_MASK (1 << OMAP_ION_HEAP_TYPE_TILER)
@@ -104,6 +105,7 @@ enum {
 	OMAP_ION_HEAP_TILER,
 	OMAP_ION_HEAP_SECURE_INPUT,
 	OMAP_ION_HEAP_NONSECURE_TILER,
+        OMAP_ION_HEAP_TILER_RESERVATION,
 };
 
 
@@ -119,6 +121,7 @@ enum {
  */
 struct ion_allocation_data {
 	size_t len;
+
 	size_t align;
 	unsigned int flags;
 	struct ion_handle *handle;
@@ -161,7 +164,22 @@ struct ion_custom_data {
 	unsigned long arg;
 };
 
-
+/**
+ * struct ion_cached_user_buf_data - metadata passed from userspace for
+ * flushing or invalidating the ion handle which was mapped cacheable.
+ * @handle:     a handle
+ * @vaddr: virtual address corresponding to the handle after mapping
+ * @size: size of the buffer which should be flushed or invalidated
+ *
+ * For ION_IOC_FLUSH_CACHED & ION_IOC_INVAL_CACHED, userspace populates
+ * the handle field with the ion handle and vaddr with the virtual address
+ * corresponding to the handle along with size to be flushed/invalidated.
+ */
+struct ion_cached_user_buf_data {
+        struct ion_handle *handle;
+        unsigned long vaddr;
+        size_t size;
+};
 
 #define ION_IOC_MAGIC		'I'
 
