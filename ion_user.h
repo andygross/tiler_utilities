@@ -32,14 +32,30 @@ enum ion_heap_type {
 	ION_HEAP_TYPE_SYSTEM,
 	ION_HEAP_TYPE_SYSTEM_CONTIG,
 	ION_HEAP_TYPE_CARVEOUT,
+	ION_HEAP_TYPE_CHUNK,
 	ION_HEAP_TYPE_CUSTOM, /* must be last so device specific heaps always
 				 are at the end of this enum */
-	ION_NUM_HEAPS,
+	ION_NUM_HEAPS = 16,
 };
 
 #define ION_HEAP_SYSTEM_MASK		(1 << ION_HEAP_TYPE_SYSTEM)
 #define ION_HEAP_SYSTEM_CONTIG_MASK	(1 << ION_HEAP_TYPE_SYSTEM_CONTIG)
 #define ION_HEAP_CARVEOUT_MASK		(1 << ION_HEAP_TYPE_CARVEOUT)
+
+#define ION_NUM_HEAP_IDS		sizeof(unsigned int) * 8
+
+
+/**
+ * heap flags - the lower 16 bits are used by core ion, the upper 16
+ * bits are reserved for use by the heaps themselves.
+ */
+#define ION_FLAG_CACHED 1		/* mappings of this buffer should be
+					   cached, ion will do cache
+					   maintenance when the buffer is
+					   mapped for dma */
+#define ION_FLAG_CACHED_NEEDS_SYNC 2	/* mappings of this buffer will created
+					   at mmap time, if this is set
+					   caches must be managed manually */
 
 
 /**
@@ -101,7 +117,7 @@ enum {
  * List of heaps in the system
  */
 enum {
-	OMAP_ION_HEAP_LARGE_SURFACES,
+	OMAP_ION_HEAP_SYSTEM,
 	OMAP_ION_HEAP_TILER,
 	OMAP_ION_HEAP_SECURE_INPUT,
 	OMAP_ION_HEAP_NONSECURE_TILER,
@@ -121,8 +137,8 @@ enum {
  */
 struct ion_allocation_data {
 	size_t len;
-
 	size_t align;
+	unsigned int heap_id_mask;
 	unsigned int flags;
 	struct ion_handle *handle;
 };
@@ -140,7 +156,6 @@ struct ion_allocation_data {
 struct ion_fd_data {
 	struct ion_handle *handle;
 	int fd;
-	unsigned char cacheable;
 };
 
 /**
@@ -230,17 +245,22 @@ struct ion_cached_user_buf_data {
 #define ION_IOC_IMPORT		_IOWR(ION_IOC_MAGIC, 5, int)
 
 /**
+ * DOC: ION_IOC_SYNC - syncs a shared file descriptors to memory
+ *
+ * Deprecated in favor of using the dma_buf api's correctly (syncing
+ * will happend automatically when the buffer is mapped to a device).
+ * If necessary should be used after touching a cached buffer from the cpu,
+ * this will make the buffer in memory coherent.
+ */
+#define ION_IOC_SYNC            _IOWR(ION_IOC_MAGIC, 7, struct ion_fd_data)
+
+/**
  * DOC: ION_IOC_CUSTOM - call architecture specific ion ioctl
  *
  * Takes the argument of the architecture specific ioctl to call and
  * passes appropriate userdata for that ioctl
  */
 #define ION_IOC_CUSTOM		_IOWR(ION_IOC_MAGIC, 6, struct ion_custom_data)
-
-#define ION_IOC_FLUSH_CACHED    _IOWR(ION_IOC_MAGIC, 7, \
-                                        struct ion_cached_user_buf_data)
-#define ION_IOC_INVAL_CACHED    _IOWR(ION_IOC_MAGIC, 8, \
-                                        struct ion_cached_user_buf_data)
 
 
 int ion_open();

@@ -77,6 +77,7 @@ int ion_alloc(int fd, size_t len, size_t align, unsigned int flags,
                 .len = len,
                 .align = align,
                 .flags = flags,
+		.heap_id_mask = OMAP_ION_HEAP_TILER_MASK,
         };
 
         ret = ion_ioctl(fd, ION_IOC_ALLOC, &data);
